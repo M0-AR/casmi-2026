@@ -138,6 +138,82 @@ build anything that depends on this, and do not read today's public LB
 ranking as real signal — the legitimate reference point is haideptry's
 openly-documented 0.339-0.350, not the leaderboard's current top.
 
+## The real bottleneck, with numbers (2026-10-06 update)
+
+A separate forum post ("Lessons from ~30 submissions: where the MRR actually
+goes", 11 votes) and the detailed exchange underneath it are the single most
+substantive, statistically rigorous source found so far -- a team reporting
+honest ablations with t-values and held-out validation, not just a final
+score. Several findings **refine or directly contradict** earlier entries in
+this document; noted below.
+
+**The central finding: once a candidate pool contains the truth, errors are
+overwhelmingly isomer errors, not formula/mass errors.** When the true
+structure was in their candidate list but not ranked first, the wrong winner
+shared the exact same molecular formula **~98% of the time**. This reframes
+the whole problem: mass-window tuning and formula filtering are not where the
+remaining skill is -- separating constitutional isomers of the same formula
+is. They built a "same-formula isomer panel" (truth + its best-scoring
+same-formula rivals) as a far more sensitive dev metric than overall MRR for
+exactly this reason.
+
+**Correction to the ±8.5ppm mass-window finding above**: on *instrument-
+matched* timsTOF spectra (which is 100% of this competition's test set),
+99% of precursor masses fall within ~5ppm, so widening 8.5->10ppm barely
+changes candidate counts at all -- the window is already full of exact-mass
+isomers. Mass window width is not a meaningful lever here; don't spend time
+tuning it.
+
+**Contradicts the earlier "curated NP databases > blind PubChem" finding**:
+this team found ChEBI/LipidMaps/NPAtlas added *no* coverage beyond PubChem
+union COCONUT for their missing molecules, and that curated-database
+membership flags looked great on their own holdout but hurt on the real
+leaderboard (their holdout molecules were over-represented in curated DBs --
+a holdout-construction artifact, not a real signal). **Open disagreement
+between two independent top teams** -- worth testing both claims ourselves
+rather than trusting either.
+
+**Rigorous example of noise discipline, worth copying exactly**: another team
+in the same thread measured an in-silico-fragmentation improvement at +0.065
+MRR (t=4.6) on their tuning panel -- but after re-validating on four
+*independent, held-out* panels (gnps/riken/mona+msdial/massbank), the real
+pooled effect was +0.023 ± 0.007 (t=3.45, n=1000), a **2.8x inflation** from
+having tuned hyperparameters on the same panel used to measure the gain. This
+smaller, honest number exactly predicted their real leaderboard result (no
+visible change: 0.341 -> 0.336, within the ~0.016 noise floor for ~130 public
+molecules). **Lesson for our own Phase 2 CV harness: a gain must hold on a
+panel the tuning never touched before it's trusted.**
+
+**Other concrete, actionable lessons from the same thread:**
+- Don't analyze the visible `test.parquet` at all -- it's a placeholder
+  drawn from training data (see the leak section above); any statistic
+  computed on it is meaningless for the hidden rerun.
+- Their own tautomer-canonicalization check found **~8% of molecules had a
+  tautomer copy of the truth under a different key** on their holdout --
+  same phenomenon as our own 4-4.4% finding on two other structure sets,
+  different population, same direction. Strengthens the case this is real
+  and worth guarding against everywhere, not a fluke of one dataset.
+- Noise floor: ~0.0025 MRR per test molecule; reseeding the same GBDT
+  reranker moved their holdout MRR by up to ±0.007. Don't chase CV
+  differences below ~0.005 (ties directly into Phase 2's plan).
+- "Novel molecule" simulations (deleting a known structure and checking if a
+  generator recovers it) overstated real reach ~3x vs. genuinely-absent
+  molecules -- validate Phase 5 only against real gaps, not simulated ones.
+- Once formula is fixed, similarity signals that don't encode atom
+  connectivity (e.g. simple fingerprint similarity) plateau quickly --
+  structure-dependent evidence (in-silico fragmentation parsimony, not
+  hand-written bond-breaking chemistry rules, which this team found added
+  nothing) is where real isomer-separating gains come from. Concrete,
+  ablated fragmentation-scorer recipe that worked for them: down-weight
+  2-bond cleavages (x0.6 vs. 1-bond), linear (not sqrt) intensity weighting,
+  tight 0.005 Da tolerance, H-shifts -2..+3.
+
+**Implication for PLAN.md**: Phase 4 (reranker) needs to prioritize
+isomer-discriminating features (in-silico fragmentation parsimony scoring)
+over additional formula/mass-window tuning, and Phase 2's CV harness must
+validate every change against a panel it wasn't tuned on before trusting the
+number -- added as explicit plan updates.
+
 ## External resources worth pulling in
 
 - **`samartalwar/casmi-2026-spectral-library-massbankharmonized`** (Kaggle

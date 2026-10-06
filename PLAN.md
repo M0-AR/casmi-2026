@@ -46,8 +46,18 @@ RESEARCH.md) or burning the 1-submission/day budget to measure progress.
   same mistake the official baseline's own code was careful to avoid).
 - Compute MRR@25 locally the same way the real scorer does (canonical
   InChIKey14 match).
-- **Verify:** local CV score is stable across random seeds/splits before
-  trusting it to guide Phase 3+ decisions.
+- Build a **second, independent holdout panel** from a different source
+  (e.g. the MassBank library) in addition to the train.parquet-derived one —
+  a hard lesson from RESEARCH.md's "~30 submissions" thread is that a change
+  can look real on one panel and vanish (or reverse) on another; two
+  disagreeing proxies is itself useful information, not a bug to resolve away.
+- **Verify:** local CV score is stable across random seeds/splits (expect
+  ~±0.007 noise from reranker reseeding alone, per the same thread) before
+  trusting it to guide Phase 3+ decisions. Never tune a change's
+  hyperparameters on the same panel used to report its gain — re-validate on
+  a panel the tuning never touched (that thread's own +0.065 → +0.023 after
+  doing this correctly is the cautionary example). Don't chase differences
+  below ~0.005.
 
 ## Phase 3 — expand retrieval coverage
 
@@ -60,6 +70,14 @@ reranking better.
   relatives via fingerprint similarity + interpretable mass deltas: ±CH2,
   ±OH, ±Hexose, etc.) — this was the single biggest reported improvement in
   the community's shared pipeline.
+- **Test curated-NP-database coverage ourselves rather than trusting either
+  side.** Two independent top teams directly disagree: one reports curated
+  DBs (COCONUT 2.0/ChEBI/LipidMaps) beating blind PubChem expansion, another
+  reports those same curated DBs added zero coverage beyond PubChem ∪
+  COCONUT and that DB-membership features looked great on their holdout but
+  *hurt* on the real leaderboard (their holdout over-represented curated-DB
+  molecules — a holdout-construction artifact). Measure our own coverage gap
+  directly against our own CV panel before picking a side.
 - **Verify:** CV MRR@25 improves over Phase 1's exact-match-only baseline.
 
 ## Phase 4 — reranker
@@ -71,10 +89,27 @@ remaining bottleneck once candidates are retrieved.
 - Engineer the feature set the community converged on (~25-30 features):
   spectral similarity scores, analog-propagation scores, precursor mass
   delta, fingerprint similarity, molecular-formula match quality.
+- **Prioritize isomer-discriminating features over more mass/formula
+  tuning.** RESEARCH.md's "~30 submissions" finding: once a candidate pool
+  contains the truth, ~98% of ranking errors are between candidates sharing
+  the *exact same formula* — mass-window width is a dead lever on
+  timsTOF data specifically (99% of precursor masses already land within
+  ~5ppm). The actual signal is connectivity-dependent: in-silico
+  fragmentation parsimony (how few bond cleavages a candidate needs to
+  explain the observed peaks) — concrete starting recipe from that same
+  thread: down-weight 2-bond cleavages (×0.6 vs. 1-bond), linear (not sqrt)
+  intensity weighting, 0.005 Da tolerance, H-shifts -2..+3. Hand-written
+  bond-breaking chemistry rules (aromatic/benzylic/ring preferences) were
+  tested and added nothing — don't spend time hand-crafting those.
+- Build a small same-formula "isomer panel" (truth + its best-scoring
+  same-formula rivals) as a dev metric alongside overall CV MRR — reported
+  as far more sensitive to exactly the errors that matter than aggregate MRR.
 - Train both HistGBM and Random Forest rerankers under the same grouped CV
   (by `inchikey14`) and compare — don't assume HistGBM wins just because it's
   more commonly shared; one team reported RF doing better for them.
-- **Verify:** CV MRR@25 improves over Phase 3's retrieval-only ranking.
+- **Verify:** CV MRR@25 improves over Phase 3's retrieval-only ranking, and
+  any isomer-panel gain must also hold on a held-out panel it wasn't tuned
+  against (see Phase 2) before being trusted.
 
 ## Phase 5 — Tier 3 (genuinely novel structures)
 
@@ -85,6 +120,11 @@ itself flags it as unsolved. Treat it as incremental, not a target to "solve."
   seeded by the FPNet-style fingerprint prediction; or a graceful fallback
   (nearest-known-structure by predicted fingerprint) rather than leaving a
   molecule with zero candidates.
+- **Validate only against genuinely-absent molecules, not simulated ones.**
+  One team found that deleting a known structure from the database and
+  testing whether a generator recovers it overstated real reach by ~3x
+  compared to molecules that are truly absent from every database. Hold out
+  real gaps for this phase's evaluation, don't simulate them.
 - **Verify:** any Tier-3 addition must not regress Tier-1/2 CV performance —
   check per-tier (if we can estimate tier membership locally) before trusting
   an aggregate score improvement.
