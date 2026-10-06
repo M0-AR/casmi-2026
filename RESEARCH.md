@@ -214,6 +214,24 @@ over additional formula/mass-window tuning, and Phase 2's CV harness must
 validate every change against a panel it wasn't tuned on before trusting the
 number -- added as explicit plan updates.
 
+## Own validation: analog propagation alone is weak but real (2026-10-06)
+
+Built `src/analog_propagation.py` (vectorized AnalogScore, see RESEARCH.md's
+4-channel description above) and tested it on the genuinely hardest MassBank
+cases: the 8,651 structures with **zero duplicate spectra anywhere** in the
+139,744-spectrum library, so exact matching cannot possibly work and any
+score has to come from fingerprint similarity to spectrally-similar-but-
+different structures. Result on 50 such queries, no formula restriction, a
+loose ±300 Da mass window, candidate pools of 10k-105k structures: **MRR@25 =
+0.0117, 6.00% hit rate**. Far below Phase 1's exact-match 0.73 on easy cases
+(expected -- this is deliberately the hardest slice), but 35-250x above
+random-guess chance given the pool sizes involved (expected chance hit rate
+for a pool of 100k is ~0.025%). Confirms analog propagation alone carries
+real, non-trivial signal, but is weak as a standalone ranker -- consistent
+with the community's own framing that it's one reranker input feature among
+several, not a complete answer, and with Tier-3-style absence being the part
+of this problem nobody has solved well yet.
+
 ## External resources worth pulling in
 
 - **`samartalwar/casmi-2026-spectral-library-massbankharmonized`** (Kaggle
