@@ -2,8 +2,15 @@
 InChIKey14 canonicalization gotcha (see RESEARCH.md) directly against our
 own computation, against the full training set.
 
-Excludes ingest_lib == 'enveda-180' (Enveda's own held-out validation set),
-matching the official baseline's own choice to keep it separate.
+Does NOT exclude ingest_lib == 'enveda-180': the official baseline notebook
+excludes it, but a host reply on the forum (topic 745148) confirms it's a
+real, legitimate published spectral library (Zenodo record 21346580), not a
+held-out validation set -- and it's actually the single largest ingest_lib
+(1.15M of 2.5M spectra, ~45%), not a small held-out slice. Excluding it would
+throw away the majority of real training coverage for no demonstrated reason;
+the baseline's exclusion looks like it was just a convenient way to shrink a
+training sample for a quick tutorial, not a correctness requirement. See
+RESEARCH.md for the full correction.
 
 Usage: venv/bin/python src/phase0_canonicalize.py
 """
@@ -26,9 +33,9 @@ def main():
     df = pd.read_parquet(
         TRAIN_PATH,
         columns=["normalized_smiles", "inchikey14", "molecular_formula", "ingest_lib"],
-        filters=[("ingest_lib", "!=", "enveda-180")],
     )
     print(f"  {len(df):,} spectra rows in {time.time() - t0:.1f}s")
+    print(f"  by ingest_lib:\n{df.ingest_lib.value_counts().to_string()}")
 
     structs = df.drop_duplicates(subset=["normalized_smiles"]).reset_index(drop=True)
     print(f"  {len(structs):,} unique structures (by normalized_smiles)")

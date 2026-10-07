@@ -38,10 +38,28 @@ Hidden test molecules fall into 3 novelty tiers (distribution not disclosed):
   `inchikey14` instead.
 - `sample_submission.csv`: `molecule_id,smiles` with 25 semicolon-joined
   placeholder SMILES (`CCO` repeated) per row, 400 rows.
-- `ingest_lib` has a special value `'enveda-180'` — Enveda's own held-out
-  validation set, which the official baseline explicitly excludes from
-  training (`filters=[('ingest_lib', '!=', 'enveda-180')]`). Worth treating
-  the same way: don't train on it, it's closer to a clean internal benchmark.
+- `ingest_lib` has 11 distinct values. Verified directly against the full,
+  real `train.parquet` (2,539,608 spectra / 277,566 structures -- matches
+  the docs' "~2.5m spectra" / "~275k structures" closely): `enveda-180`
+  (1,153,785 spectra -- **the single largest library, ~45% of all data**),
+  `pluskal_ms2` (527,581), `riken` (347,171), `gnps` (220,849), `massbank`
+  (101,727), `mona` (92,416), `spectraverse` (50,933), `msdial` (40,765),
+  `drug_plus` (2,545), `enveda-np-examples` (1,184 -- this is the small
+  natural-product panel top teams reference, e.g. "241 enveda-np-examples
+  molecules" in the "~30 submissions" thread above), `masaryk` (652).
+
+  **Correction to an earlier assumption in this doc**: the official baseline
+  notebook excludes `ingest_lib == 'enveda-180'`
+  (`filters=[('ingest_lib', '!=', 'enveda-180')]`), which we initially read
+  as "Enveda's own held-out validation set, keep separate." A host reply on
+  the forum (topic 745148) confirms this is wrong -- Enveda-180 is a real,
+  legitimate **published spectral library** (Zenodo record 21346580), fine
+  to use, not a held-out set, and as the counts above show it's actually the
+  *majority* of the real training data, not a small slice. The baseline's
+  exclusion looks like it was just a convenient way to shrink the training
+  sample for a quick single-session tutorial (consistent with its separate
+  `MAX_TRAIN_SPECTRA = 200_000` cap), not a correctness requirement. **We do
+  not exclude it** -- `src/phase0_canonicalize.py` was updated accordingly.
 
 ## Critical correctness gotcha (verified via forum + will re-verify ourselves)
 
