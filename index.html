@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CASMI 2026 Agent — Identifying Molecules from Mass Spectra</title>
+<meta name="description" content="A from-scratch retrieval pipeline that identifies unknown molecules from mass-spectrometry data, built and verified entirely against real data.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0d12;
+    --bg-panel: #11141b;
+    --bg-panel-2: #161a23;
+    --border: #232835;
+    --text: #e7e9ee;
+    --text-dim: #9aa3b5;
+    --text-faint: #6b7385;
+    --accent: #5ee6c7;
+    --accent-2: #7aa2ff;
+    --accent-3: #ffb86b;
+    --danger: #ff6b81;
+    --radius: 14px;
+    --maxw: 960px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  code, pre, .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 20px; }
+
+  header.hero {
+    padding: 80px 20px 60px;
+    text-align: center;
+    background:
+      radial-gradient(ellipse 800px 400px at 50% -10%, rgba(94,230,199,0.12), transparent),
+      radial-gradient(ellipse 600px 300px at 80% 10%, rgba(122,162,255,0.10), transparent);
+    border-bottom: 1px solid var(--border);
+  }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--accent); font-weight: 600; margin-bottom: 18px;
+  }
+  .eyebrow::before { content: "🧪"; font-size: 15px; }
+  h1 {
+    font-size: clamp(32px, 6vw, 52px);
+    font-weight: 800;
+    margin: 0 0 16px;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #fff 30%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .tagline {
+    font-size: clamp(16px, 2.4vw, 20px);
+    color: var(--text-dim);
+    max-width: 640px;
+    margin: 0 auto 28px;
+  }
+  .badges { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 32px; }
+  .badge {
+    font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 100px;
+    background: var(--bg-panel-2); border: 1px solid var(--border); color: var(--text-dim);
+  }
+  .badge.accent { color: var(--accent); border-color: rgba(94,230,199,0.3); }
+
+  .cta-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 22px; border-radius: 10px; font-weight: 600; font-size: 14px;
+    text-decoration: none; transition: transform 0.15s ease, opacity 0.15s ease;
+    border: 1px solid var(--border);
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn.primary { background: var(--accent); color: #06130f; border-color: var(--accent); }
+  .btn.ghost { color: var(--text); background: var(--bg-panel-2); }
+
+  main { padding: 64px 0; }
+  section { margin-bottom: 72px; }
+  section h2 {
+    font-size: 26px; font-weight: 700; margin: 0 0 8px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-sub { color: var(--text-dim); margin: 0 0 28px; font-size: 15px; max-width: 680px; }
+
+  .card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
+  .stat {
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px; text-align: center;
+  }
+  .stat .num { font-size: 28px; font-weight: 800; color: var(--accent); font-family: 'JetBrains Mono', monospace; }
+  .stat .label { font-size: 12.5px; color: var(--text-dim); margin-top: 6px; }
+
+  .pipeline { display: flex; flex-direction: column; gap: 10px; }
+  .pipe-step {
+    display: flex; align-items: center; gap: 16px;
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 20px;
+  }
+  .pipe-step .pn {
+    flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(94,230,199,0.12); color: var(--accent);
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: 'JetBrains Mono', monospace;
+  }
+  .pipe-step .pt { font-weight: 600; }
+  .pipe-step .pd { color: var(--text-dim); font-size: 13.5px; margin-top: 2px; }
+  .pipe-arrow { text-align: center; color: var(--text-faint); font-size: 18px; margin: -2px 0; }
+
+  .terminal {
+    background: #05070a; border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .terminal .bar {
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+    background: #0d0f14; border-bottom: 1px solid var(--border);
+  }
+  .terminal .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .terminal pre {
+    margin: 0; padding: 18px; font-size: 12.5px; color: #c9d1e0;
+    overflow-x: auto; white-space: pre;
+  }
+  .terminal .ok { color: var(--accent); }
+  .terminal .dim { color: var(--text-faint); }
+
+  details.explainer {
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px 22px; margin-bottom: 12px;
+  }
+  details.explainer summary {
+    cursor: pointer; font-weight: 600; font-size: 15.5px; list-style: none;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  details.explainer summary::after { content: "+"; color: var(--accent); font-size: 20px; }
+  details.explainer[open] summary::after { content: "–"; }
+  details.explainer p, details.explainer li { color: var(--text-dim); font-size: 14.5px; }
+  details.explainer[open] { border-color: rgba(94,230,199,0.3); }
+
+  .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .feature { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .feature .ic { font-size: 22px; margin-bottom: 10px; }
+  .feature h3 { margin: 0 0 6px; font-size: 15.5px; }
+  .feature p { margin: 0; color: var(--text-dim); font-size: 13.5px; }
+
+  /* Quiz */
+  #quiz-card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; }
+  .quiz-progress { font-size: 13px; color: var(--text-faint); margin-bottom: 14px; }
+  .quiz-q { font-size: 17px; font-weight: 600; margin-bottom: 18px; }
+  .quiz-opts { display: flex; flex-direction: column; gap: 10px; }
+  .quiz-opt {
+    text-align: left; padding: 13px 16px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg-panel-2); color: var(--text); cursor: pointer; font-size: 14.5px;
+    font-family: inherit; transition: border-color 0.15s;
+  }
+  .quiz-opt:hover { border-color: var(--accent-2); }
+  .quiz-opt.correct { border-color: var(--accent); background: rgba(94,230,199,0.1); }
+  .quiz-opt.incorrect { border-color: var(--danger); background: rgba(255,107,129,0.1); }
+  .quiz-opt:disabled { cursor: default; }
+  .quiz-explain { margin-top: 16px; font-size: 13.5px; color: var(--text-dim); padding-top: 14px; border-top: 1px solid var(--border); display: none; }
+  .quiz-explain.show { display: block; }
+  .quiz-next { margin-top: 18px; }
+  .quiz-result { text-align: center; }
+  .quiz-result .score { font-size: 44px; font-weight: 800; color: var(--accent); font-family: 'JetBrains Mono', monospace; }
+
+  footer {
+    border-top: 1px solid var(--border); padding: 40px 20px; text-align: center;
+    color: var(--text-faint); font-size: 13px;
+  }
+  footer a { color: var(--text-dim); }
+
+  a { color: var(--accent-2); }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="eyebrow">Enveda CASMI 2026 &middot; Kaggle Research Competition</div>
+  <h1>Identifying Molecules<br>from Mass Spectra</h1>
+  <p class="tagline">A from-scratch retrieval pipeline that predicts a molecule's chemical structure
+    from raw mass-spectrometry data — built and verified at every step against real data, not assumptions.</p>
+  <div class="badges">
+    <span class="badge accent">● Pipeline validated end-to-end on Kaggle</span>
+    <span class="badge">MIT License</span>
+    <span class="badge">Python 3.12+ &middot; RDKit 2026.3.3</span>
+  </div>
+  <div class="cta-row">
+    <a class="btn primary" href="#beginner-guide">🌱 Start with the Beginner Guide</a>
+    <a class="btn ghost" href="#quiz">🧠 Test yourself</a>
+    <a class="btn ghost" href="https://github.com/M0-AR/casmi-2026" target="_blank" rel="noopener">View on GitHub</a>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section id="stats">
+    <h2>The numbers, as actually run</h2>
+    <p class="section-sub">Every figure below is read directly from a real execution log — nothing is projected.</p>
+    <div class="stat-grid">
+      <div class="stat"><div class="num">2.5M</div><div class="label">real MS/MS spectra searched</div></div>
+      <div class="stat"><div class="num">277,566</div><div class="label">unique structures canonicalized, 0 failures</div></div>
+      <div class="stat"><div class="num">400 / 400</div><div class="label">test molecules got real candidates</div></div>
+      <div class="stat"><div class="num">10,000 / 10,000</div><div class="label">candidate SMILES parse correctly</div></div>
+      <div class="stat"><div class="num">~82 min</div><div class="label">full Kaggle run (9h budget allowed)</div></div>
+      <div class="stat"><div class="num">1.61%</div><div class="label">structures where the shipped data's own identity column was wrong</div></div>
+    </div>
+  </section>
+
+  <section id="beginner-guide">
+    <h2>🌱 Beginner Guide — from zero to pro</h2>
+    <p class="section-sub">No chemistry or machine-learning background required. Work through these in order —
+      by the end you'll understand this problem better than most people who'd be asked about it in a technical interview.</p>
+
+    <details class="explainer" open>
+      <summary>1. What is a molecule, and why does identifying one matter?</summary>
+      <p>Every chemical substance — water, caffeine, aspirin, a hormone in your blood — is a specific arrangement
+      of atoms. Knowing a molecule's <strong>structure</strong> (which atoms, connected how) is what lets chemists
+      understand what it does, whether it's safe, and how to make more of it. Discovering a new medicine very
+      often starts with finding an interesting molecule in nature and figuring out exactly what it is.</p>
+    </details>
+
+    <details class="explainer">
+      <summary>2. How do you "weigh" a molecule you've never seen before?</summary>
+      <p>A <strong>mass spectrometer</strong> takes a tiny sample, breaks its molecules into charged fragments, and
+      measures the exact weight and abundance of each fragment. Isolating one molecule and then shattering
+      <em>that</em> molecule to weigh its pieces is called <strong>tandem mass spectrometry (MS/MS)</strong>, and
+      the result — a list of (fragment weight, abundance) pairs — is called a <strong>spectrum</strong>. It acts
+      like a fingerprint, but there's no complete, perfect lookup table of every possible molecule's fingerprint.</p>
+    </details>
+
+    <details class="explainer">
+      <summary>3. Why is going from "spectrum" to "structure" hard?</summary>
+      <p>Three cases, in increasing order of difficulty:</p>
+      <ol>
+        <li><strong>Already in a reference library</strong> — someone has measured this exact compound before.
+          Easy case: find the matching fingerprint.</li>
+        <li><strong>Structure is known, but no one has measured its spectrum.</strong> You infer it by finding
+          structurally similar "cousin" molecules whose spectra <em>are</em> known.</li>
+        <li><strong>Never been cataloged at all.</strong> The genuinely open research problem — unsolved even by
+          the best teams in this competition.</li>
+      </ol>
+      <p>Two completely different molecules can also share the exact same atoms, just connected differently
+      (called <strong>isomers</strong>), and often produce very similar spectra. Telling those apart turns out to
+      be the single hardest part of this whole problem — see <a href="RESEARCH.md">Research &amp; Findings</a>.</p>
+    </details>
+
+    <details class="explainer">
+      <summary>4. How do you write a molecule's structure down as text?</summary>
+      <p><strong>SMILES</strong> is a compact text encoding of a molecule's atoms and bonds that software can
+      parse (aspirin is <code>CC(=O)OC1=CC=CC=C1C(=O)O</code>). <strong>InChIKey</strong> is a fixed-length hash
+      computed <em>from</em> a structure, so two different SMILES spellings of the same molecule produce the same
+      key — essential, because the same molecule can be drawn a couple of equally valid ways
+      (called <strong>tautomers</strong>). This project found that the training data's convenience identity column
+      skips that standardization step — and measured exactly how much score that silently costs if you trust it.</p>
+    </details>
+
+    <details class="explainer">
+      <summary>5. So what does this pipeline actually do?</summary>
+      <ol>
+        <li><strong>Look it up</strong> — compare the unknown spectrum against ~2.5 million spectra with known
+          structures.</li>
+        <li><strong>Look for cousins</strong> — if nothing matches closely, search for similar-but-not-identical
+          spectra and weigh candidates by structural "family resemblance" (<strong>Tanimoto similarity</strong>
+          between molecular fingerprints).</li>
+        <li><strong>Rank, best guess first</strong> — up to 25 ranked guesses per molecule, scored by how early
+          the right answer appears.</li>
+      </ol>
+      <p><strong>You now know enough to read the rest of this page, and most of RESEARCH.md, without looking
+        anything else up.</strong></p>
+    </details>
+  </section>
+
+  <section id="how-it-works">
+    <h2>🧩 How it works</h2>
+    <p class="section-sub">The actual retrieval pipeline, step by step.</p>
+    <div class="pipeline">
+      <div class="pipe-step">
+        <div class="pn">1</div>
+        <div><div class="pt">Precursor-mass + adduct filter</div>
+        <div class="pd">Narrows ~2.5M training spectra down to plausible candidates within a ±8.5ppm mass window.</div></div>
+      </div>
+      <div class="pipe-arrow">↓</div>
+      <div class="pipe-step">
+        <div class="pn">2</div>
+        <div><div class="pt">Spectral similarity (cosine, peak-matched)</div>
+        <div class="pd">Scores every surviving candidate against the query spectrum's actual fragment pattern.</div></div>
+      </div>
+      <div class="pipe-arrow">↓</div>
+      <div class="pipe-step">
+        <div class="pn">3</div>
+        <div><div class="pt">Analog propagation (if no strong match)</div>
+        <div class="pd">Falls back to fingerprint-similarity-weighted evidence from spectrally related "cousins."</div></div>
+      </div>
+      <div class="pipe-arrow">↓</div>
+      <div class="pipe-step">
+        <div class="pn">4</div>
+        <div><div class="pt">Canonical dedup &amp; ranking</div>
+        <div class="pd">Candidates are deduplicated by scorer-exact InChIKey14 and output best-guess-first, top 25.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="real-run">
+    <h2>A real run, not a demo</h2>
+    <p class="section-sub">This is an excerpt of the actual log from the submission notebook's real execution on Kaggle's infrastructure.</p>
+    <div class="terminal">
+      <div class="bar">
+        <span class="dot" style="background:#ff5f57"></span>
+        <span class="dot" style="background:#febc2e"></span>
+        <span class="dot" style="background:#28c840"></span>
+        <span class="mono" style="color:var(--text-faint); font-size:12px; margin-left:4px;">kaggle · casmi26-phase-1-exact-match-retrieval</span>
+      </div>
+      <pre>using wheel: /kaggle/input/datasets/prvsiyan/rdkit-wheel-offline/rdkit-2026.3.3-cp312-cp312-manylinux_2_28_x86_64.whl
+extracted: ['rdkit', 'rdkit.libs', 'rdkit-2026.3.3.dist-info', 'rdkit-stubs']
+277,566 unique structures, 1.2s
+canonicalize returncode: 0
+<span class="ok">canonicalization done: 0 / 277566 failed to parse, 4469.5s total</span>
+1,213 test spectra, 400 molecules
+  batch 1/21 (131,072 rows seen), 34.7s elapsed
+  batch 2/21 (262,144 rows seen), 66.6s elapsed
+  <span class="dim">... 17 more batches ...</span>
+  batch 20/21 (2,539,608 rows seen), 405.2s elapsed
+<span class="ok">wrote submission.csv: 400 rows</span>
+<span class="ok">guesses per molecule: median 25, max 25</span>
+<span class="ok">molecules with zero candidates (fallback only): 0 / 400</span>
+total time: 405.3s</pre>
+    </div>
+  </section>
+
+  <section id="features">
+    <h2>✨ Features</h2>
+    <div class="feature-grid">
+      <div class="feature"><div class="ic">🔍</div><h3>Exact-match spectral retrieval</h3>
+        <p>Across a real 2.5M-spectrum library, streamed in memory-safe batches rather than loaded all at once.</p></div>
+      <div class="feature"><div class="ic">🧬</div><h3>Scorer-exact canonicalization</h3>
+        <p>Recomputes every structure's canonical identity the same way the real competition scorer does.</p></div>
+      <div class="feature"><div class="ic">🧪</div><h3>Analog propagation</h3>
+        <p>Fingerprint-weighted evidence from spectral "cousins" when no exact match exists, independently validated.</p></div>
+      <div class="feature"><div class="ic">☁️</div><h3>Real Kaggle-native pipeline</h3>
+        <p>Not just local scripts — the actual submission notebook runs correctly end-to-end on Kaggle's own infrastructure.</p></div>
+      <div class="feature"><div class="ic">📐</div><h3>Evidence-first engineering</h3>
+        <p>Every design decision traces to a logged, reproducible measurement — see Research &amp; Findings.</p></div>
+      <div class="feature"><div class="ic">📖</div><h3>Explained from first principles</h3>
+        <p>The Beginner Guide above assumes zero prior chemistry or ML background.</p></div>
+    </div>
+  </section>
+
+  <section id="quiz">
+    <h2>🧠 Test yourself</h2>
+    <p class="section-sub">Five questions covering everything in the Beginner Guide above.</p>
+    <div id="quiz-card"></div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    MIT Licensed · <a href="LICENSE">LICENSE</a> ·
+    <a href="RESEARCH.md">Research &amp; Findings</a> ·
+    <a href="PLAN.md">Build Plan</a> ·
+    <a href="https://github.com/M0-AR/casmi-2026">Source on GitHub</a>
+  </div>
+</footer>
+
+<script>
+const QUESTIONS = [
+  {
+    q: "A mass spectrometer measures the m/z of fragments after breaking a molecule apart. What does this list of (weight, abundance) pairs get called?",
+    opts: ["A chromatogram", "A spectrum", "A titration curve", "An isotope table"],
+    correct: 1,
+    explain: "That list is the spectrum — the molecule's fragmentation fingerprint."
+  },
+  {
+    q: "Two different molecules share the exact same atoms, just connected differently, and often look alike in a spectrum. What's this called?",
+    opts: ["Enantiomers", "Isotopes", "Isomers", "Polymers"],
+    correct: 2,
+    explain: "Isomers share a formula but differ in connectivity — distinguishing them is the hardest part of this problem."
+  },
+  {
+    q: "Why do we compare molecules by InChIKey rather than by their raw SMILES text?",
+    opts: [
+      "InChIKey is shorter to type",
+      "The same molecule can have several equally valid SMILES spellings (tautomers); InChIKey hashes to the same value for all of them",
+      "SMILES can't represent rings",
+      "InChIKey includes 3D coordinates"
+    ],
+    correct: 1,
+    explain: "Different tautomer spellings of one molecule produce different SMILES but the same canonical InChIKey — which is exactly why this project recomputes it rather than trusting a provided column."
+  },
+  {
+    q: "When no exact spectral match exists for an unknown molecule, what does this pipeline do?",
+    opts: [
+      "Gives up and returns no candidates",
+      "Randomly guesses from the full chemical database",
+      "Looks for structurally related 'cousin' molecules via fingerprint similarity to spectrally similar candidates",
+      "Always picks the heaviest possible molecule"
+    ],
+    correct: 2,
+    explain: "This is analog propagation — using Tanimoto similarity between fingerprints, weighted by how spectrally similar the 'cousin' is."
+  },
+  {
+    q: "The scoring metric is Mean Reciprocal Rank @ 25. If your 2nd guess is the correct one, what score do you get for that molecule?",
+    opts: ["1.0", "0.5", "0.25", "0.04"],
+    correct: 1,
+    explain: "MRR scores 1/rank — a correct guess at position 2 scores 1/2 = 0.5."
+  }
+];
+
+let current = 0, score = 0;
+const card = document.getElementById('quiz-card');
+
+function renderQuestion() {
+  if (current >= QUESTIONS.length) {
+    card.innerHTML = `
+      <div class="quiz-result">
+        <div class="quiz-progress">Done</div>
+        <div class="score">${score} / ${QUESTIONS.length}</div>
+        <p style="color:var(--text-dim)">${score === QUESTIONS.length ? "Perfect score — you've genuinely got this." : "Scroll back up to the Beginner Guide to review anything you missed."}</p>
+        <button class="btn ghost" style="margin-top:10px" onclick="window.__quizRestart()">Try again</button>
+      </div>`;
+    return;
+  }
+  const item = QUESTIONS[current];
+  card.innerHTML = `
+    <div class="quiz-progress">Question ${current + 1} of ${QUESTIONS.length}</div>
+    <div class="quiz-q">${item.q}</div>
+    <div class="quiz-opts">
+      ${item.opts.map((o, i) => `<button class="quiz-opt" data-i="${i}">${o}</button>`).join('')}
+    </div>
+    <div class="quiz-explain" id="quiz-explain">${item.explain}</div>
+    <div class="quiz-next" style="display:none" id="quiz-next-wrap">
+      <button class="btn primary" id="quiz-next-btn">Next →</button>
+    </div>
+  `;
+  const buttons = card.querySelectorAll('.quiz-opt');
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = parseInt(btn.dataset.i, 10);
+      buttons.forEach(b => b.disabled = true);
+      if (i === item.correct) {
+        btn.classList.add('correct');
+        score++;
+      } else {
+        btn.classList.add('incorrect');
+        buttons[item.correct].classList.add('correct');
+      }
+      document.getElementById('quiz-explain').classList.add('show');
+      document.getElementById('quiz-next-wrap').style.display = 'block';
+    });
+  });
+  document.getElementById('quiz-next-btn').addEventListener('click', () => {
+    current++;
+    renderQuestion();
+  });
+}
+
+window.__quizRestart = function() {
+  current = 0; score = 0;
+  renderQuestion();
+};
+
+renderQuestion();
+</script>
+
+</body>
+</html>
