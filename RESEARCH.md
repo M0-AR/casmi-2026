@@ -83,12 +83,26 @@ relying on them: a possible one-electron-mass offset in positive-mode m/z
 **Independently verified** (2026-10-06): ran our own RDKit 2026.3.3 tautomer
 canonicalization (`src/canonicalize.py`) against a completely separate
 20,204-structure set (the MassBank reference library, see below) — 0 parse
-failures, and a **4.07% shipped-vs-canonical mismatch rate**, closely
-matching the forum's 4.4% figure on the competition's own structures. Two
-independent structure sets landing in the same ~4% range confirms this is a
-real, stable phenomenon (not a one-off artifact) and that our canonicalizer
-is implemented correctly — it also reproduces the competition's own worked
-glucose example (`docs/Evaluation` page) exactly.
+failures, and a 4.07% shipped-vs-canonical mismatch rate, close to the
+forum's 4.4% figure (measured on "the natural product libraries", 66,490
+structures). It also reproduces the competition's own worked glucose example
+(`docs/Evaluation` page) exactly.
+
+**Then ran it for real, against the full, actual competition training set**
+(2026-10-07, `src/phase0_canonicalize.py`, 277,566 real structures from the
+now fully-downloaded `train.parquet`): 0 parse failures (100% success), but
+only a **1.61% mismatch rate** (4,467 structures) and a 0.59% key-collapse
+rate (1,615 of 275,810 shipped-distinct keys collapse to 274,195 canonical
+ones) -- noticeably *lower* than the ~4%/1-in-22 figures above. The
+phenomenon itself is confirmed real on all three independent measurements
+(it never goes to zero), but **its magnitude is population-dependent**: the
+forum's and our MassBank number were both measured on natural-product-heavy
+or reference-library-only structure sets, which are more tautomer-prone than
+`train.parquet`'s full, broader population (which spans many libraries --
+see the `ingest_lib` breakdown below -- not just natural products). Practical
+takeaway unchanged either way: always recompute the canonical key ourselves,
+never trust the shipped column -- just don't assume the ~4% figure
+transfers to the full training population without checking.
 
 ## What's actually winning (community state, 2026-10-06)
 
