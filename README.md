@@ -15,6 +15,14 @@
 
 ![CASMI 2026 Agent preview](docs/preview-hero.png)
 
+<details>
+<summary><strong>▶ Watch a real walkthrough</strong> (actual captured page interactions — scroll through the beginner guide, then the quiz being answered live)</summary>
+<br>
+
+![Walkthrough of the CASMI 2026 Agent page, including the beginner guide and live quiz](docs/demo.gif)
+
+</details>
+
 ---
 
 ## Abstract
