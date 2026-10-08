@@ -9,7 +9,7 @@
 [![RDKit 2026.3.3](https://img.shields.io/badge/rdkit-2026.3.3-green)](https://www.rdkit.org/)
 [![Status](https://img.shields.io/badge/pipeline-validated%20end--to--end%20on%20Kaggle-success)](#status)
 
-[Live demo & walkthrough](https://M0-AR.github.io/casmi-2026/) · [Beginner Guide](#-beginner-guide--from-zero-to-pro) · [How it works](#-how-it-works) · [Research](RESEARCH.md) · [Plan](PLAN.md)
+[**▶ Live demo**](https://m0-ar.github.io/casmi-2026/) · [Beginner Guide](#-beginner-guide--from-zero-to-pro) · [How it works](#-how-it-works) · [Research](RESEARCH.md) · [Plan](PLAN.md)
 
 </div>
 
